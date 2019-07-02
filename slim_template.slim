@@ -1,0 +1,77 @@
+// set up a simple neutral simulation
+initialize() {
+
+	// set the overall mutation rate
+	initializeMutationRate(5e-6);
+
+	// m1 mutation type: (neutral)
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	// m2 mutation type: (deleterious)
+	initializeMutationType("m2", 0.5, "f", -1.0);
+	// m3 mutation type: (beneficial)
+	initializeMutationType("m3", 0.5, "f", 0.1);
+
+	// g1 genomic element type: (synonymous) uses m1 for all mutations
+	initializeGenomicElementType("g1", m1, 1.0);
+	// g2 genomic element type: (nonsynonymous) uses all mutations
+	initializeGenomicElementType("g2", c(m1,m2,m3), c(1,0,0));
+
+	// uniform chromosome of length 10 kb
+
+	count = 0;
+	for (i in 0:30000) {
+		count2 = count;
+		count = count2 + 1;
+		if (count == 1) {
+			initializeGenomicElement(g1, i, i);
+		} else if (count == 2) {
+			initializeGenomicElement(g2, i, i);
+		} else if (count == 3) {
+			initializeGenomicElement(g2, i, i);
+			count = 0;
+		}
+	}
+
+	// uniform recombination along the chromosome
+	initializeRecombinationRate(5e-6);
+}
+
+// create a population of 10000 individuals
+1{
+	sim.addSubpop("p1", 1000);
+}
+
+// Split de p1 in the generation 10000
+10000 { sim.addSubpopSplit("p2", 1000, p1); }
+
+// Sudden Change in population size
+28000 { p2.setSubpopulationSize(1000); }
+//if required, force a strong selective sweep
+//29800 {	
+//	target = sample(p2.genomes, 100); //the mutation is in 100 individuals
+//	target.addNewDrawnMutation(m3, 15000);//the mutation occurs at position 15000
+//}
+
+// Run to the final
+30000 late() {
+	// Select 100 samples from the 10000 and output to MS format
+	// Select the outgroup and 100 samples of the target population and output to MS format
+	// obtain random samples of genomes from the three subpopulations
+	g_1 = sample(p2.genomes,100,F);
+	g_2 = sample(p1.genomes,10,F);
+	//Concatenate the 2 samples
+	g_12=c(g_1,g_2);
+		//Get the unique mutations in the sample, sorted by position
+		m = sortBy(unique(g_12.mutations),"position");
+		// print the number of segregating sites
+		cat("//" + "\n");
+		cat("segsites: "+ size(m) + "\n");
+		//print the positions
+		positions = format("%.6f", m.position / sim.chromosome.lastPosition);
+		cat("positions: "+ paste(positions," ") + "\n");
+		//print the sampled genomes
+		for (genome in g_12){
+			hasMuts = (match(m,genome.mutations) >= 0);
+			cat(paste(asInteger(hasMuts),"") + "\n");
+		}
+}
